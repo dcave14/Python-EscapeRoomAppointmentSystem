@@ -11,12 +11,12 @@
             <ul class="navbar-nav ml-auto">
                 {% if user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="#">Welcome, {{ user.username }}</a>
+                        <a class="nav-link" href="{% url 'profile' %}">Welcome, {{ user.username }}</a>
                     </li>
                     <li class="nav-item">
                         <form action="{% url 'logout' %}" method="post" style="display: inline;">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-link nav-link" style="display: inline; padding: 0; background: none; border: none;">Logout</button>
+                            <button type="submit" class="btn btn-link nav-link">Logout</button>
                         </form>
                     </li>
                 {% else %}
