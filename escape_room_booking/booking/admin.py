@@ -3,8 +3,7 @@ from .models import EscapeRoom, Booking
 
 @admin.register(EscapeRoom)
 class EscapeRoomAdmin(admin.ModelAdmin):
-    list_display = ('name', 'theme', 'difficulty', 'duration', 'price')
-    list_filter = ('theme', 'difficulty')
+    list_display = ('name', 'difficulty', 'duration', 'price')
     search_fields = ('name', 'description')
     
 @admin.register(Booking)

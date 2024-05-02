@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ escape_room.name }}</h1>
+    <div class="row">
+        <div class="col-md-6">
+            {% if escape_room.image %}
+            <img src="{{ escape_room.image.url }}" class="img-fluid" alt="{{ escape_room.name }}">
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <p><strong>Description:</strong> {{ escape_room.description }}</p>
+            <p><strong>Difficulty:</strong> {{ escape_room.difficulty }}</p>
+            <p><strong>Duration:</strong> {{ escape_room.duration }} minutes</p>
+            <p><strong>Capacity:</strong> {{ escape_room.capacity }} players</p>
+            <p><strong>Price:</strong> ${{ escape_room.price }}</p>
+            
+            <form method="post" action="{% url 'booking:create_booking' escape_room.id %}">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary">Book Now</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

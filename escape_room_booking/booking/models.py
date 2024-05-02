@@ -4,12 +4,12 @@ from django.contrib.auth.models import User
 class EscapeRoom(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField()
-    theme = models.CharField(max_length=100)
-    difficulty = models.CharField(max_length=20)
+    difficulty = models.IntegerField()  # Changed from CharField to IntegerField
     duration = models.IntegerField()
     capacity = models.IntegerField()
     price = models.DecimalField(max_digits=8, decimal_places=2)
     image = models.ImageField(upload_to='room_images/', null=True, blank=True)
+    availability = models.BooleanField(default=True)  # Adjust the field type as needed
 
     def __str__(self):
         return self.name

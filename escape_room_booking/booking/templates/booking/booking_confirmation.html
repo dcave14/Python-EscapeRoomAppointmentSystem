@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Booking Confirmation</h1>
+    <p>Thank you for your booking!</p>
+    <div>
+        <p><strong>Escape Room:</strong> {{ booking.escape_room.name }}</p>
+        <p><strong>Date:</strong> {{ booking.date }}</p>
+        <p><strong>Time Slot:</strong> {{ booking.time_slot }}</p>
+        <p><strong>Number of Participants:</strong> {{ booking.num_participants }}</p>
+        <p><strong>Total Price:</strong> ${{ booking.total_price }}</p>
+    </div>
+    <a href="{% url 'booking:escape_room_list' %}" class="btn btn-primary">Back to Escape Rooms</a>
+</div>
+{% endblock %}

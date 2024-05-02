@@ -55,8 +55,7 @@ from .models import EscapeRoom, Booking
 
 @admin.register(EscapeRoom)
 class EscapeRoomAdmin(admin.ModelAdmin):
-    list_display = ('name', 'theme', 'difficulty', 'duration', 'price')
-    list_filter = ('theme', 'difficulty')
+    list_display = ('name', 'difficulty', 'duration', 'price')
     search_fields = ('name', 'description')
     
 @admin.register(Booking)
@@ -74,6 +73,20 @@ class BookingConfig(AppConfig):
     name = "booking"
 
 
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\forms.py ----
+from django import forms
+from .models import Booking
+
+class BookingForm(forms.ModelForm):
+    class Meta:
+        model = Booking
+        fields = ['date', 'time_slot', 'num_participants']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date'}),
+            'time_slot': forms.Select(choices=[('morning', 'Morning'), ('afternoon', 'Afternoon'), ('evening', 'Evening')]),
+            'num_participants': forms.NumberInput(attrs={'min': 1, 'max': 10}),
+        }
+
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\models.py ----
 from django.db import models
 from django.contrib.auth.models import User
@@ -81,12 +94,12 @@ from django.contrib.auth.models import User
 class EscapeRoom(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField()
-    theme = models.CharField(max_length=100)
-    difficulty = models.CharField(max_length=20)
+    difficulty = models.IntegerField()  # Changed from CharField to IntegerField
     duration = models.IntegerField()
     capacity = models.IntegerField()
     price = models.DecimalField(max_digits=8, decimal_places=2)
     image = models.ImageField(upload_to='room_images/', null=True, blank=True)
+    availability = models.BooleanField(default=True)  # Adjust the field type as needed
 
     def __str__(self):
         return self.name
@@ -104,19 +117,125 @@ class Booking(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.room.name} - {self.date}"
 
+
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\tests.py ----
 from django.test import TestCase
 
 # Create your tests here.
 
 
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\urls.py ----
+from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
+from . import views
+
+app_name = 'booking'
+
+urlpatterns = [
+    path('escape-rooms/', views.escape_room_list, name='escape_room_list'),
+    path('escape-rooms/<int:room_id>/', views.escape_room_detail, name='escape_room_detail'),
+    path('escape-rooms/<int:room_id>/book/', views.create_booking, name='create_booking'),
+    path('bookings/<int:booking_id>/confirmation/', views.booking_confirmation, name='booking_confirmation'),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\views.py ----
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.utils import timezone
+from .models import EscapeRoom, Booking
+from .forms import BookingForm
 
-# Create your views here.
+def create_booking(request, room_id):
+    escape_room = get_object_or_404(EscapeRoom, id=room_id)
+    if request.method == 'POST':
+        form = BookingForm(request.POST)
+        if form.is_valid():
+            booking = form.save(commit=False)
+            booking.user = request.user
+            booking.escape_room = escape_room
+            
+            # Validate availability and capacity
+            if not is_available(booking):
+                messages.error(request, 'The selected time slot is not available.')
+                return redirect('booking:escape_room_detail', room_id=room_id)
+            
+            if booking.num_participants > escape_room.capacity:
+                messages.error(request, 'The number of participants exceeds the room capacity.')
+                return redirect('booking:escape_room_detail', room_id=room_id)
+            
+            # Calculate total price
+            booking.total_price = calculate_price(booking)
+            
+            booking.save()
+            return redirect('booking:booking_confirmation', booking_id=booking.id)
+    else:
+        form = BookingForm()
+    
+    context = {
+        'escape_room': escape_room,
+        'form': form,
+    }
+    return render(request, 'booking/escape_room_detail.html', context)
 
+def is_available(booking):
+    # Check if the selected date and time slot are available
+    current_datetime = timezone.now()
+    if booking.date < current_datetime.date():
+        return False
+    
+    overlapping_bookings = Booking.objects.filter(
+        escape_room=booking.escape_room,
+        date=booking.date,
+        time_slot=booking.time_slot,
+    )
+    return not overlapping_bookings.exists()
+
+def calculate_price(booking):
+    # Calculate the total price based on duration and number of participants
+    base_price = booking.escape_room.price
+    additional_cost_per_participant = 10
+    total_price = base_price + (booking.num_participants * additional_cost_per_participant)
+    return total_price
+
+def escape_room_detail(request, room_id):
+    escape_room = get_object_or_404(EscapeRoom, id=room_id)
+    print(escape_room.image.url)  # Print the image URL
+    return render(request, 'booking/escape_room_detail.html', {'escape_room': escape_room})
+
+def escape_room_list(request):
+    rooms = EscapeRoom.objects.all()  # Fetches all EscapeRoom objects from the database
+    return render(request, 'booking/escape_room_list.html', {'escape_rooms': rooms})
+
+def booking_confirmation(request, booking_id):
+    booking = get_object_or_404(Booking, pk=booking_id)
+    return render(request, 'booking/booking_confirmation.html', {'booking': booking})
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\__init__.py ----
+
+
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\management\commands\load_data.py ----
+from django.core.management.base import BaseCommand
+from booking.models import EscapeRoom
+
+class Command(BaseCommand):
+    help = 'Preloads initial escape room data into the database'
+
+    def handle(self, *args, **options):
+        # Check if any EscapeRoom data already exists to prevent duplicate entries
+        if EscapeRoom.objects.exists():
+            self.stdout.write(self.style.WARNING('Initial data already loaded!'))
+        else:
+            # Data to preload
+            rooms = [
+                EscapeRoom(name="Pirate's Cove", description="Find the hidden treasure before time runs out.", difficulty=5, capacity=5, duration=60, price=25.00),
+                EscapeRoom(name="Haunted Mansion", description="Escape the ghosts that haunt this creepy old house.", difficulty=7, capacity=6, duration=60, price=30.00)
+            ]
+            EscapeRoom.objects.bulk_create(rooms)
+            self.stdout.write(self.style.SUCCESS('Successfully loaded initial data'))
 
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\0001_initial.py ----
@@ -197,8 +316,141 @@ class Migration(migrations.Migration):
     ]
 
 
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\0002_escaperoom_availability_alter_escaperoom_difficulty_and_more.py ----
+# Generated by Django 5.0.4 on 2024-05-02 01:01
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("booking", "0001_initial"),
+    ]
+
+    operations = [
+        migrations.AddField(
+            model_name="escaperoom",
+            name="availability",
+            field=models.BooleanField(default=True),
+        ),
+        migrations.AlterField(
+            model_name="escaperoom",
+            name="difficulty",
+            field=models.CharField(blank=True, max_length=20),
+        ),
+        migrations.AlterField(
+            model_name="escaperoom",
+            name="theme",
+            field=models.CharField(blank=True, max_length=100),
+        ),
+    ]
+
+
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\0003_remove_escaperoom_theme_alter_escaperoom_difficulty.py ----
+# Generated by Django 5.0.4 on 2024-05-02 01:11
+
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        (
+            "booking",
+            "0002_escaperoom_availability_alter_escaperoom_difficulty_and_more",
+        ),
+    ]
+
+    operations = [
+        migrations.RemoveField(
+            model_name="escaperoom",
+            name="theme",
+        ),
+        migrations.AlterField(
+            model_name="escaperoom",
+            name="difficulty",
+            field=models.IntegerField(),
+        ),
+    ]
+
+
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\__init__.py ----
 
+
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\templates\booking\booking_confirmation.html ----
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Booking Confirmation</h1>
+    <p>Thank you for your booking!</p>
+    <div>
+        <p><strong>Escape Room:</strong> {{ booking.escape_room.name }}</p>
+        <p><strong>Date:</strong> {{ booking.date }}</p>
+        <p><strong>Time Slot:</strong> {{ booking.time_slot }}</p>
+        <p><strong>Number of Participants:</strong> {{ booking.num_participants }}</p>
+        <p><strong>Total Price:</strong> ${{ booking.total_price }}</p>
+    </div>
+    <a href="{% url 'booking:escape_room_list' %}" class="btn btn-primary">Back to Escape Rooms</a>
+</div>
+{% endblock %}
+
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\templates\booking\escape_room_detail.html ----
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>{{ escape_room.name }}</h1>
+    <div class="row">
+        <div class="col-md-6">
+            {% if escape_room.image %}
+            <img src="{{ escape_room.image.url }}" class="img-fluid" alt="{{ escape_room.name }}">
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <p><strong>Description:</strong> {{ escape_room.description }}</p>
+            <p><strong>Difficulty:</strong> {{ escape_room.difficulty }}</p>
+            <p><strong>Duration:</strong> {{ escape_room.duration }} minutes</p>
+            <p><strong>Capacity:</strong> {{ escape_room.capacity }} players</p>
+            <p><strong>Price:</strong> ${{ escape_room.price }}</p>
+            
+            <form method="post" action="{% url 'booking:create_booking' escape_room.id %}">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary">Book Now</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\templates\booking\escape_room_list.html ----
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Escape Rooms</h1>
+    <div class="row">
+        {% for room in escape_rooms %}
+        <div class="col-md-4">
+            <div class="card mb-4">
+                {% if room.image %}
+                <img src="{{ room.image.url }}" class="card-img-top" alt="{{ room.name }}">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ room.name }}</h5>
+                    <p class="card-text">{{ room.description|truncatewords:20 }}</p>
+                    <a href="{% url 'booking:escape_room_detail' room.id %}" class="btn btn-primary">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col">
+            <p>No escape rooms available.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\escape_room_booking\asgi.py ----
 """
@@ -234,6 +486,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
+
+from django.conf import settings
+from django.conf.urls.static import static
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -353,6 +608,10 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+MEDIA_ROOT = os.path.join(BASE_DIR, 'room_images')
+MEDIA_URL = '/media/'
+
+
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\escape_room_booking\urls.py ----
 """
@@ -374,12 +633,18 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from . import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
+    path('booking/', include('booking.urls')),
     path('', views.home, name='home'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\escape_room_booking\views.py ----
 from django.shortcuts import render
@@ -421,6 +686,9 @@ application = get_wsgi_application()
         <nav class="navbar navbar-expand-lg navbar-light bg-light">
             <a class="navbar-brand" href="{% url 'home' %}">Escape Room Booking</a>
             <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'booking:escape_room_list' %}">Escape Rooms</a>
+                </li>
                 {% if user.is_authenticated %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'profile' %}">Welcome, {{ user.username }}</a>
@@ -443,7 +711,6 @@ application = get_wsgi_application()
         </nav>
     </header>
     
-
     <main>
         {% block content %}
         {% endblock %}
@@ -469,7 +736,7 @@ application = get_wsgi_application()
 
     <div class="row">
         <div class="col-md-12">
-            <a href="#" class="btn btn-primary btn-lg">View Escape Rooms</a>
+            <a href="{% url 'booking:escape_room_list' %}" class="btn btn-primary btn-lg">View Escape Rooms</a>
         </div>
     </div>
 </div>
@@ -539,10 +806,12 @@ from django.contrib.auth.models import User
 
 class UserRegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True)
+    first_name = forms.CharField(required=True)
+    last_name = forms.CharField(required=True)
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2']
+        fields = ['username', 'email', 'first_name', 'last_name', 'password1', 'password2']
         
 class UserUpdateForm(forms.ModelForm):
     email = forms.EmailField()
@@ -597,7 +866,10 @@ def register(request):
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
-            form.save()
+            user = form.save()
+            user.first_name = form.cleaned_data.get('first_name')
+            user.last_name = form.cleaned_data.get('last_name')
+            user.save()
             username = form.cleaned_data.get('username')
             password = form.cleaned_data.get('password1')
             user = authenticate(username=username, password=password)

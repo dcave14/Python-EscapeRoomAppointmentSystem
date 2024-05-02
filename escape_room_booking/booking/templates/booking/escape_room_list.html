@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Escape Rooms</h1>
+    <div class="row">
+        {% for room in escape_rooms %}
+        <div class="col-md-4">
+            <div class="card mb-4">
+                {% if room.image %}
+                <img src="{{ room.image.url }}" class="card-img-top" alt="{{ room.name }}">
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title">{{ room.name }}</h5>
+                    <p class="card-text">{{ room.description|truncatewords:20 }}</p>
+                    <a href="{% url 'booking:escape_room_detail' room.id %}" class="btn btn-primary">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col">
+            <p>No escape rooms available.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
