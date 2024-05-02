@@ -1,10 +1,12 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
+
 from .forms import UserRegistrationForm
 from django.contrib.auth.decorators import login_required
 from .forms import UserUpdateForm
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
+from booking.models import Booking
 
 def register(request):
     if request.method == 'POST':
@@ -38,11 +40,11 @@ def user_login(request):
 
 @login_required
 def profile(request):
-    return render(request, 'users/profile.html')
-
-@login_required
-def profile(request):
-    return render(request, 'users/profile.html')
+    # Fetch the bookings of the current user
+    bookings = Booking.objects.filter(user=request.user)
+    
+    # Pass the bookings to the template
+    return render(request, 'users/profile.html', {'bookings': bookings})
 
 @login_required
 def update_profile(request):

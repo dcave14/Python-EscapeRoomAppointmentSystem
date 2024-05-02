@@ -179,6 +179,7 @@ urlpatterns = [
     path('escape-rooms/<int:room_id>/', views.escape_room_detail, name='escape_room_detail'),
     path('escape-rooms/<int:room_id>/book/', views.create_booking, name='create_booking'),
     path('bookings/<int:booking_id>/confirmation/', views.booking_confirmation, name='booking_confirmation'),
+    path('escape-rooms/<int:room_id>/available-times/', views.available_times, name='available_times'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 if settings.DEBUG:
@@ -192,6 +193,8 @@ from django.utils import timezone
 from .models import EscapeRoom, Booking
 from .forms import BookingForm
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+
 
 @login_required
 def create_booking(request, room_id):
@@ -288,6 +291,21 @@ def escape_room_list(request):
 def booking_confirmation(request, booking_id):
     booking = get_object_or_404(Booking, pk=booking_id)
     return render(request, 'booking/booking_confirmation.html', {'booking': booking})
+
+def available_times(request, room_id):
+    selected_date = request.GET.get('date')
+    if not selected_date:
+        return JsonResponse({"error": "No date provided"}, status=400)
+    
+    room = get_object_or_404(EscapeRoom, id=room_id)
+    bookings = Booking.objects.filter(room=room, date=selected_date)
+    occupied_times = [(booking.start_time, booking.end_time) for booking in bookings]
+
+    # Assuming you operate from 9 AM to 9 PM
+    all_times = [datetime.time(hour=h) for h in range(9, 21)]
+    available_times = [time for time in all_times if all(not (booking[0] <= time < booking[1]) for booking in occupied_times)]
+
+    return JsonResponse({"available_times": [time.strftime('%H:%M') for time in available_times]})
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\__init__.py ----
 
