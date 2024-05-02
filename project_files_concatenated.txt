@@ -727,7 +727,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 MEDIA_ROOT = os.path.join(BASE_DIR, 'room_images')
 MEDIA_URL = '/media/'
 
-
+LOGIN_URL = 'login'
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\escape_room_booking\urls.py ----
 """
@@ -840,7 +840,6 @@ application = get_wsgi_application()
     </main>
 
     <footer>
-        <!-- Add footer content -->
     </footer>
 </body>
 </html>
