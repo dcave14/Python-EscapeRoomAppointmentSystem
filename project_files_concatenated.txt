@@ -49,6 +49,22 @@ if __name__ == "__main__":
     main()
 
 
+---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\test_regex.py ----
+import re
+
+def test_time_regex():
+    pattern = r'^(0?[1-9]|1[0-2]):\d{2} (AM|PM)$'
+    time_strings = ['09:00 AM', '12:30 PM', '9:45 AM', '10:00 PM', '25:00 AM', '09:00', 'AM 09:00']
+
+    for time_str in time_strings:
+        if re.match(pattern, time_str):
+            print(f"Match: {time_str}")
+        else:
+            print(f"No match: {time_str}")
+
+if __name__ == '__main__':
+    test_time_regex()
+
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\admin.py ----
 from django.contrib import admin
 from .models import EscapeRoom, Booking
@@ -57,10 +73,10 @@ from .models import EscapeRoom, Booking
 class EscapeRoomAdmin(admin.ModelAdmin):
     list_display = ('name', 'difficulty', 'duration', 'price')
     search_fields = ('name', 'description')
-    
+
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ('user', 'room', 'date', 'time_slot', 'num_participants', 'total_price')
+    list_display = ('user', 'room', 'date', 'start_time', 'end_time', 'num_participants', 'total_price')
     list_filter = ('date', 'room')
     search_fields = ('user__username', 'room__name')
 
@@ -74,18 +90,44 @@ class BookingConfig(AppConfig):
 
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\forms.py ----
+import re
 from django import forms
 from .models import Booking
 
 class BookingForm(forms.ModelForm):
     class Meta:
         model = Booking
-        fields = ['date', 'time_slot', 'num_participants']
+        fields = ['date', 'start_time', 'end_time', 'num_participants']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
-            'time_slot': forms.Select(choices=[('morning', 'Morning'), ('afternoon', 'Afternoon'), ('evening', 'Evening')]),
+            'start_time': forms.TimeInput(attrs={'class': 'timepicker'}),
+            'end_time': forms.TimeInput(attrs={'class': 'timepicker'}),
             'num_participants': forms.NumberInput(attrs={'min': 1, 'max': 10}),
         }
+    
+    def validate_time(self, time):
+        time_str = time.strftime('%H:%M')
+        pattern = r'^([01]\d|2[0-3]):([0-5]\d)$'
+        if not re.match(pattern, time_str):
+            raise forms.ValidationError('Enter a valid time.')
+        return time
+
+    
+    def clean_start_time(self):
+        start_time = self.cleaned_data.get('start_time')
+        print(f"Cleaned start_time: {start_time}")  # Debug statement
+        print(f"Type of start_time: {type(start_time)}")  # Debug statement
+        if not self.validate_time(start_time):
+            raise forms.ValidationError("Invalid start time format. Please use HH:MM AM/PM format.")
+        return start_time
+
+    def clean_end_time(self):
+        end_time = self.cleaned_data.get('end_time')
+        print(f"Cleaned end_time: {end_time}")  # Debug statement
+        print(f"Type of end_time: {type(end_time)}")  # Debug statement
+        if not self.validate_time(end_time):
+            raise forms.ValidationError("Invalid end time format. Please use HH:MM AM/PM format.")
+        return end_time
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\models.py ----
 from django.db import models
@@ -108,7 +150,8 @@ class Booking(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(EscapeRoom, on_delete=models.CASCADE)
     date = models.DateField()
-    time_slot = models.TimeField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
     num_participants = models.IntegerField()
     total_price = models.DecimalField(max_digits=8, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -116,7 +159,6 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.room.name} - {self.date}"
-
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\tests.py ----
 from django.test import TestCase
@@ -137,44 +179,72 @@ urlpatterns = [
     path('escape-rooms/<int:room_id>/', views.escape_room_detail, name='escape_room_detail'),
     path('escape-rooms/<int:room_id>/book/', views.create_booking, name='create_booking'),
     path('bookings/<int:booking_id>/confirmation/', views.booking_confirmation, name='booking_confirmation'),
-]
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\views.py ----
+import datetime
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
 from .models import EscapeRoom, Booking
 from .forms import BookingForm
+from django.contrib.auth.decorators import login_required
 
+@login_required
 def create_booking(request, room_id):
     escape_room = get_object_or_404(EscapeRoom, id=room_id)
     if request.method == 'POST':
         form = BookingForm(request.POST)
+        print("Submitted form data:")
+        print(request.POST)
         if form.is_valid():
             booking = form.save(commit=False)
             booking.user = request.user
-            booking.escape_room = escape_room
-            
-            # Validate availability and capacity
-            if not is_available(booking):
-                messages.error(request, 'The selected time slot is not available.')
-                return redirect('booking:escape_room_detail', room_id=room_id)
-            
-            if booking.num_participants > escape_room.capacity:
-                messages.error(request, 'The number of participants exceeds the room capacity.')
-                return redirect('booking:escape_room_detail', room_id=room_id)
-            
-            # Calculate total price
-            booking.total_price = calculate_price(booking)
-            
-            booking.save()
-            return redirect('booking:booking_confirmation', booking_id=booking.id)
+            booking.room = escape_room
+
+            start_time = form.cleaned_data['start_time']
+            end_time = form.cleaned_data['end_time']
+
+            # Validate start and end times
+            try:
+                print("Parsed start_time:", start_time)  # Debug statement
+                print("Parsed end_time:", end_time)  # Debug statement
+            except ValueError:
+                form.add_error('start_time', 'Enter a valid time.')
+                form.add_error('end_time', 'Enter a valid time.')
+            else:
+                # Check if end time is after start time
+                if end_time <= start_time:
+                    form.add_error('end_time', 'End time must be after start time.')
+
+            if not form.errors:
+                # Validate availability and capacity
+                if not is_available(booking):
+                    messages.error(request, 'The selected time slot is not available.')
+                    return redirect('booking:escape_room_detail', room_id=room_id)
+
+                if booking.num_participants > escape_room.capacity:
+                    messages.error(request, 'The number of participants exceeds the room capacity.')
+                    return redirect('booking:escape_room_detail', room_id=room_id)
+
+                # Validate fully booked days
+                if is_fully_booked(booking.date):
+                    messages.error(request, 'The selected day is fully booked.')
+                    return redirect('booking:escape_room_detail', room_id=room_id)
+
+                # Calculate total price
+                booking.total_price = calculate_price(booking)
+
+                booking.save()
+                return redirect('booking:booking_confirmation', booking_id=booking.id)
+        else:
+            print("Form errors:", form.errors)  # Debug statement
     else:
         form = BookingForm()
-    
+
     context = {
         'escape_room': escape_room,
         'form': form,
@@ -183,27 +253,32 @@ def create_booking(request, room_id):
 
 def is_available(booking):
     # Check if the selected date and time slot are available
-    current_datetime = timezone.now()
-    if booking.date < current_datetime.date():
-        return False
-    
     overlapping_bookings = Booking.objects.filter(
-        escape_room=booking.escape_room,
+        room=booking.room,
         date=booking.date,
-        time_slot=booking.time_slot,
+        start_time__lt=booking.end_time,
+        end_time__gt=booking.start_time,
     )
     return not overlapping_bookings.exists()
 
+def is_fully_booked(date):
+    # Check if the selected date is fully booked
+    bookings = Booking.objects.filter(date=date)
+    available_slots = EscapeRoom.objects.filter(availability=True).count() * 12
+    booked_slots = bookings.count()
+    return booked_slots >= available_slots
+
 def calculate_price(booking):
     # Calculate the total price based on duration and number of participants
-    base_price = booking.escape_room.price
+    base_price = booking.room.price
     additional_cost_per_participant = 10
     total_price = base_price + (booking.num_participants * additional_cost_per_participant)
     return total_price
 
 def escape_room_detail(request, room_id):
     escape_room = get_object_or_404(EscapeRoom, id=room_id)
-    print(escape_room.image.url)  # Print the image URL
+    if escape_room.image and escape_room.image.url:
+        print(escape_room.image.url)  # Print the image URL
     return render(request, 'booking/escape_room_detail.html', {'escape_room': escape_room})
 
 def escape_room_list(request):
@@ -239,7 +314,7 @@ class Command(BaseCommand):
 
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\0001_initial.py ----
-# Generated by Django 5.0.4 on 2024-04-30 01:28
+# Generated by Django 5.0.4 on 2024-05-02 10:25
 
 import django.db.models.deletion
 from django.conf import settings
@@ -268,8 +343,7 @@ class Migration(migrations.Migration):
                 ),
                 ("name", models.CharField(max_length=100)),
                 ("description", models.TextField()),
-                ("theme", models.CharField(max_length=100)),
-                ("difficulty", models.CharField(max_length=20)),
+                ("difficulty", models.IntegerField()),
                 ("duration", models.IntegerField()),
                 ("capacity", models.IntegerField()),
                 ("price", models.DecimalField(decimal_places=2, max_digits=8)),
@@ -277,6 +351,7 @@ class Migration(migrations.Migration):
                     "image",
                     models.ImageField(blank=True, null=True, upload_to="room_images/"),
                 ),
+                ("availability", models.BooleanField(default=True)),
             ],
         ),
         migrations.CreateModel(
@@ -292,7 +367,8 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 ("date", models.DateField()),
-                ("time_slot", models.TimeField()),
+                ("start_time", models.TimeField()),
+                ("end_time", models.TimeField()),
                 ("num_participants", models.IntegerField()),
                 ("total_price", models.DecimalField(decimal_places=2, max_digits=8)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
@@ -316,63 +392,6 @@ class Migration(migrations.Migration):
     ]
 
 
----- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\0002_escaperoom_availability_alter_escaperoom_difficulty_and_more.py ----
-# Generated by Django 5.0.4 on 2024-05-02 01:01
-
-from django.db import migrations, models
-
-
-class Migration(migrations.Migration):
-    dependencies = [
-        ("booking", "0001_initial"),
-    ]
-
-    operations = [
-        migrations.AddField(
-            model_name="escaperoom",
-            name="availability",
-            field=models.BooleanField(default=True),
-        ),
-        migrations.AlterField(
-            model_name="escaperoom",
-            name="difficulty",
-            field=models.CharField(blank=True, max_length=20),
-        ),
-        migrations.AlterField(
-            model_name="escaperoom",
-            name="theme",
-            field=models.CharField(blank=True, max_length=100),
-        ),
-    ]
-
-
----- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\0003_remove_escaperoom_theme_alter_escaperoom_difficulty.py ----
-# Generated by Django 5.0.4 on 2024-05-02 01:11
-
-from django.db import migrations, models
-
-
-class Migration(migrations.Migration):
-    dependencies = [
-        (
-            "booking",
-            "0002_escaperoom_availability_alter_escaperoom_difficulty_and_more",
-        ),
-    ]
-
-    operations = [
-        migrations.RemoveField(
-            model_name="escaperoom",
-            name="theme",
-        ),
-        migrations.AlterField(
-            model_name="escaperoom",
-            name="difficulty",
-            field=models.IntegerField(),
-        ),
-    ]
-
-
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\migrations\__init__.py ----
 
 
@@ -384,9 +403,10 @@ class Migration(migrations.Migration):
     <h1>Booking Confirmation</h1>
     <p>Thank you for your booking!</p>
     <div>
-        <p><strong>Escape Room:</strong> {{ booking.escape_room.name }}</p>
+        <p><strong>Escape Room:</strong> {{ booking.room.name }}</p>
         <p><strong>Date:</strong> {{ booking.date }}</p>
-        <p><strong>Time Slot:</strong> {{ booking.time_slot }}</p>
+        <p><strong>Start Time:</strong> {{ booking.start_time }}</p>
+        <p><strong>End Time:</strong> {{ booking.end_time }}</p>
         <p><strong>Number of Participants:</strong> {{ booking.num_participants }}</p>
         <p><strong>Total Price:</strong> ${{ booking.total_price }}</p>
     </div>
@@ -418,10 +438,57 @@ class Migration(migrations.Migration):
                 {{ form.as_p }}
                 <button type="submit" class="btn btn-primary">Book Now</button>
             </form>
+
+            {% if form.errors %}
+            <div class="alert alert-danger">
+                <strong>Form submission failed:</strong>
+                <ul>
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+    $(document).ready(function() {
+      $('.timepicker').timepicker({
+          timeFormat: 'h:i A',
+          interval: 60,
+          minTime: '9:00am',
+          maxTime: '9:00pm',
+          startTime: '9:00am',
+          dynamic: false,
+          dropdown: true,
+          scrollbar: true
+      });
+
+      $('#id_start_time').on('changeTime', function() {
+          var startTime = $(this).val();
+          var minEndTime = moment(startTime, 'h:mm a').add(1, 'hour').format('h:mm a');
+          var maxEndTime = moment(startTime, 'h:mm a').add(3, 'hour').format('h:mm a');
+          $('#id_end_time').timepicker('option', 'minTime', minEndTime);
+          $('#id_end_time').timepicker('option', 'maxTime', maxEndTime);
+      });
+
+      $('form').on('submit', function() {
+          var startTime = $('#id_start_time').val();
+          var endTime = $('#id_end_time').val();
+          $('#id_start_time').val(moment(startTime, 'h:mm A').format('HH:mm'));
+          $('#id_end_time').val(moment(endTime, 'h:mm A').format('HH:mm'));
+      });
+  });
+  </script>
 {% endblock %}
+
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\templates\booking\escape_room_list.html ----
 {% extends 'base.html' %}
@@ -493,7 +560,6 @@ from django.conf.urls.static import static
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -536,7 +602,7 @@ ROOT_URLCONF = "escape_room_booking.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"], 
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -602,6 +668,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, 'static_collected')
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -641,7 +709,7 @@ urlpatterns = [
     path('users/', include('users.urls')),
     path('booking/', include('booking.urls')),
     path('', views.home, name='home'),
-]
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
@@ -675,11 +743,18 @@ application = get_wsgi_application()
 
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\escape_room_booking\templates\base.html ----
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
     <title>{% block title %}Escape Room Booking{% endblock %}</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <link rel="stylesheet" href="{% static 'css/jquery.timepicker.min.css' %}">
+    <script src="{% static 'js/jquery-3.7.1.min.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="{% static 'js/jquery.timepicker.min.js' %}"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </head>
 <body>
     <header>
@@ -719,10 +794,6 @@ application = get_wsgi_application()
     <footer>
         <!-- Add footer content -->
     </footer>
-
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
 
@@ -840,9 +911,13 @@ from django.test import TestCase
 
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\users\urls.py ----
-from django.urls import path
 from . import views
 from django.contrib.auth import views as auth_views
+from django.contrib import admin
+from django.urls import path, include
+from . import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('register/', views.register, name='register'),
@@ -851,7 +926,7 @@ urlpatterns = [
     path('profile/update/', views.update_profile, name='update_profile'),
     path('profile/change-password/', views.change_password, name='change_password'),
     path('logout/', auth_views.LogoutView.as_view(template_name='users/logout.html', next_page='home'), name='logout'),
-]
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\users\views.py ----
 from django.shortcuts import render, redirect

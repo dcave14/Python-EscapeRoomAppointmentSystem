@@ -5,9 +5,10 @@
     <h1>Booking Confirmation</h1>
     <p>Thank you for your booking!</p>
     <div>
-        <p><strong>Escape Room:</strong> {{ booking.escape_room.name }}</p>
+        <p><strong>Escape Room:</strong> {{ booking.room.name }}</p>
         <p><strong>Date:</strong> {{ booking.date }}</p>
-        <p><strong>Time Slot:</strong> {{ booking.time_slot }}</p>
+        <p><strong>Start Time:</strong> {{ booking.start_time }}</p>
+        <p><strong>End Time:</strong> {{ booking.end_time }}</p>
         <p><strong>Number of Participants:</strong> {{ booking.num_participants }}</p>
         <p><strong>Total Price:</strong> ${{ booking.total_price }}</p>
     </div>

@@ -21,7 +21,53 @@
                 {{ form.as_p }}
                 <button type="submit" class="btn btn-primary">Book Now</button>
             </form>
+
+            {% if form.errors %}
+            <div class="alert alert-danger">
+                <strong>Form submission failed:</strong>
+                <ul>
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+    $(document).ready(function() {
+      $('.timepicker').timepicker({
+          timeFormat: 'h:i A',
+          interval: 60,
+          minTime: '9:00am',
+          maxTime: '9:00pm',
+          startTime: '9:00am',
+          dynamic: false,
+          dropdown: true,
+          scrollbar: true
+      });
+
+      $('#id_start_time').on('changeTime', function() {
+          var startTime = $(this).val();
+          var minEndTime = moment(startTime, 'h:mm a').add(1, 'hour').format('h:mm a');
+          var maxEndTime = moment(startTime, 'h:mm a').add(3, 'hour').format('h:mm a');
+          $('#id_end_time').timepicker('option', 'minTime', minEndTime);
+          $('#id_end_time').timepicker('option', 'maxTime', maxEndTime);
+      });
+
+      $('form').on('submit', function() {
+          var startTime = $('#id_start_time').val();
+          var endTime = $('#id_end_time').val();
+          $('#id_start_time').val(moment(startTime, 'h:mm A').format('HH:mm'));
+          $('#id_end_time').val(moment(endTime, 'h:mm A').format('HH:mm'));
+      });
+  });
+  </script>
 {% endblock %}
