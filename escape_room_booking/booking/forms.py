@@ -23,16 +23,16 @@ class BookingForm(forms.ModelForm):
     
     def clean_start_time(self):
         start_time = self.cleaned_data.get('start_time')
-        print(f"Cleaned start_time: {start_time}")  # Debug statement
-        print(f"Type of start_time: {type(start_time)}")  # Debug statement
+        print(f"Cleaned start_time: {start_time}")
+        print(f"Type of start_time: {type(start_time)}")
         if not self.validate_time(start_time):
             raise forms.ValidationError("Invalid start time format. Please use HH:MM AM/PM format.")
         return start_time
 
     def clean_end_time(self):
         end_time = self.cleaned_data.get('end_time')
-        print(f"Cleaned end_time: {end_time}")  # Debug statement
-        print(f"Type of end_time: {type(end_time)}")  # Debug statement
+        print(f"Cleaned end_time: {end_time}")
+        print(f"Type of end_time: {type(end_time)}")
         if not self.validate_time(end_time):
             raise forms.ValidationError("Invalid end time format. Please use HH:MM AM/PM format.")
         return end_time

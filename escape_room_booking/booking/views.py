@@ -25,8 +25,8 @@ def create_booking(request, room_id):
 
             # Validate start and end times
             try:
-                print("Parsed start_time:", start_time)  # Debug statement
-                print("Parsed end_time:", end_time)  # Debug statement
+                print("Parsed start_time:", start_time)
+                print("Parsed end_time:", end_time)
             except ValueError:
                 form.add_error('start_time', 'Enter a valid time.')
                 form.add_error('end_time', 'Enter a valid time.')
@@ -56,7 +56,7 @@ def create_booking(request, room_id):
                 booking.save()
                 return redirect('booking:booking_confirmation', booking_id=booking.id)
         else:
-            print("Form errors:", form.errors)  # Debug statement
+            print("Form errors:", form.errors)
     else:
         form = BookingForm()
 
@@ -77,14 +77,12 @@ def is_available(booking):
     return not overlapping_bookings.exists()
 
 def is_fully_booked(date):
-    # Check if the selected date is fully booked
     bookings = Booking.objects.filter(date=date)
     available_slots = EscapeRoom.objects.filter(availability=True).count() * 12
     booked_slots = bookings.count()
     return booked_slots >= available_slots
 
 def calculate_price(booking):
-    # Calculate the total price based on duration and number of participants
     base_price = booking.room.price
     additional_cost_per_participant = 10
     total_price = base_price + (booking.num_participants * additional_cost_per_participant)
@@ -93,11 +91,11 @@ def calculate_price(booking):
 def escape_room_detail(request, room_id):
     escape_room = get_object_or_404(EscapeRoom, id=room_id)
     if escape_room.image and escape_room.image.url:
-        print(escape_room.image.url)  # Print the image URL
+        print(escape_room.image.url)
     return render(request, 'booking/escape_room_detail.html', {'escape_room': escape_room})
 
 def escape_room_list(request):
-    rooms = EscapeRoom.objects.all()  # Fetches all EscapeRoom objects from the database
+    rooms = EscapeRoom.objects.all()
     return render(request, 'booking/escape_room_list.html', {'escape_rooms': rooms})
 
 def booking_confirmation(request, booking_id):
@@ -113,7 +111,6 @@ def available_times(request, room_id):
     bookings = Booking.objects.filter(room=room, date=selected_date)
     occupied_times = [(booking.start_time, booking.end_time) for booking in bookings]
 
-    # Assuming you operate from 9 AM to 9 PM
     all_times = [datetime.time(hour=h) for h in range(9, 21)]
     available_times = [time for time in all_times if all(not (booking[0] <= time < booking[1]) for booking in occupied_times)]
 
