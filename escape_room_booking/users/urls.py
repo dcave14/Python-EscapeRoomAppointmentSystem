@@ -12,5 +12,6 @@ urlpatterns = [
     path('profile/', views.profile, name='profile'),
     path('profile/update/', views.update_profile, name='update_profile'),
     path('profile/change-password/', views.change_password, name='change_password'),
+    path('request_cancellation/<int:booking_id>/', views.request_cancellation, name='request_cancellation'),
     path('logout/', auth_views.LogoutView.as_view(template_name='users/logout.html', next_page='home'), name='logout'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

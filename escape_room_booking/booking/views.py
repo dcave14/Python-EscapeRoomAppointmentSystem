@@ -118,3 +118,11 @@ def available_times(request, room_id):
     available_times = [time for time in all_times if all(not (booking[0] <= time < booking[1]) for booking in occupied_times)]
 
     return JsonResponse({"available_times": [time.strftime('%H:%M') for time in available_times]})
+
+@login_required
+def request_cancellation(request, booking_id):
+    booking = Booking.objects.get(id=booking_id)
+    if booking.user == request.user:
+        booking.cancellation_requested = True
+        booking.save()
+    return redirect('profile')

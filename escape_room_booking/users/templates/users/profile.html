@@ -32,6 +32,13 @@
                 <td>{{ booking.start_time }}</td>
                 <td>{{ booking.end_time }}</td>
                 <td>{{ booking.room }}</td>
+                <td>
+                    {% if not booking.cancellation_requested %}
+                    <a href="{% url 'request_cancellation' booking.id %}" class="btn btn-primary">Request Cancellation</a>
+                    {% else %}
+                    Cancellation Requested
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

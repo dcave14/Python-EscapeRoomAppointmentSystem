@@ -69,3 +69,12 @@ def change_password(request):
     else:
         form = PasswordChangeForm(request.user)
     return render(request, 'users/change_password.html', {'form': form})
+
+
+@login_required
+def request_cancellation(request, booking_id):
+    booking = Booking.objects.get(id=booking_id)
+    if booking.user == request.user:
+        booking.cancellation_requested = True
+        booking.save()
+    return redirect('profile')
