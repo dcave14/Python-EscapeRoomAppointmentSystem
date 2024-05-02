@@ -76,8 +76,8 @@ class EscapeRoomAdmin(admin.ModelAdmin):
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ('user', 'room', 'date', 'start_time', 'end_time', 'num_participants', 'total_price')
-    list_filter = ('date', 'room')
+    list_display = ('user', 'room', 'date', 'start_time', 'end_time', 'num_participants', 'total_price', 'cancellation_requested')
+    list_filter = ('date', 'room', 'cancellation_requested')
     search_fields = ('user__username', 'room__name')
 
 ---- F:\COLLEGE\SEMESTER 5\PYTHON II\FINAL PROJECT\Python-EscapeRoomAppointmentSystem\escape_room_booking\booking\apps.py ----
